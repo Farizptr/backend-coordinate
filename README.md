@@ -8,8 +8,8 @@ A production-ready **FastAPI backend service** for building detection using YOLO
 ```bash
 git clone https://github.com/Farizptr/backend-coordinate.git
 cd backend-coordinate
-pip install -r requirements.txt
-```
+   pip install -r requirements.txt
+   ```
 
 ### 2. Start the API Server
 ```bash
