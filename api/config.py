@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     
     # Server Configuration
     host: str = Field(default="0.0.0.0", env="HOST")
-    port: int = Field(default=8000, env="PORT")
+    port: int = Field(default=5050, env="PORT")
     reload: bool = Field(default=True, env="RELOAD")
     log_level: str = Field(default="info", env="LOG_LEVEL")
     
