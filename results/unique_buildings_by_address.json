@@ -1,0 +1,61 @@
+[
+  {
+    "building_id": 1,
+    "latitude": -6.219891498650719,
+    "longitude": 106.72686501703822,
+    "address": "Jalan Komplek Kopkamtib, RW 02, Joglo, Kembangan, Jakarta Barat, Daerah Khusus ibukota Jakarta, Jawa, 11650, Indonesia",
+    "details": {
+      "road": "Jalan Komplek Kopkamtib",
+      "city_block": "RW 02",
+      "village": "Joglo",
+      "suburb": "Kembangan",
+      "city_district": "Jakarta Barat",
+      "city": "Daerah Khusus ibukota Jakarta",
+      "ISO3166-2-lvl4": "ID-JK",
+      "region": "Jawa",
+      "ISO3166-2-lvl3": "ID-JW",
+      "postcode": "11650",
+      "country": "Indonesia",
+      "country_code": "id"
+    }
+  },
+  {
+    "building_id": 3,
+    "latitude": -6.220090556364857,
+    "longitude": 106.72794477095522,
+    "address": "RW 02, Joglo, Kembangan, Jakarta Barat, Daerah Khusus ibukota Jakarta, Jawa, 11650, Indonesia",
+    "details": {
+      "city_block": "RW 02",
+      "village": "Joglo",
+      "suburb": "Kembangan",
+      "city_district": "Jakarta Barat",
+      "city": "Daerah Khusus ibukota Jakarta",
+      "ISO3166-2-lvl4": "ID-JK",
+      "region": "Jawa",
+      "ISO3166-2-lvl3": "ID-JW",
+      "postcode": "11650",
+      "country": "Indonesia",
+      "country_code": "id"
+    }
+  },
+  {
+    "building_id": 42,
+    "latitude": -6.220909743936266,
+    "longitude": 106.72724516992275,
+    "address": "Jalan Musyawarah, RW 02, Joglo, Kembangan, Jakarta Barat, Daerah Khusus ibukota Jakarta, Jawa, 11650, Indonesia",
+    "details": {
+      "road": "Jalan Musyawarah",
+      "city_block": "RW 02",
+      "village": "Joglo",
+      "suburb": "Kembangan",
+      "city_district": "Jakarta Barat",
+      "city": "Daerah Khusus ibukota Jakarta",
+      "ISO3166-2-lvl4": "ID-JK",
+      "region": "Jawa",
+      "ISO3166-2-lvl3": "ID-JW",
+      "postcode": "11650",
+      "country": "Indonesia",
+      "country_code": "id"
+    }
+  }
+]
