@@ -78,7 +78,8 @@ app = FastAPI(
     description=settings.app_description,
     version=settings.app_version,
     debug=settings.debug,
-    lifespan=lifespan
+    lifespan=lifespan,
+    openapi_version="3.0.0"
 )
 
 # CORS middleware with configurable settings
@@ -99,6 +100,24 @@ app.include_router(health_router)
 app.include_router(detection_router)
 app.include_router(jobs_router)
 app.include_router(jobs_list_router)
+
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    openapi_schema["openapi"] = "3.0.0"
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 
 # For direct execution
