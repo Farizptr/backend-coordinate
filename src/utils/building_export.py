@@ -88,6 +88,7 @@ def save_buildings_simple_format(results_data, geojson_path, output_path="buildi
     buildings_to_check = results_data.get('detections', [])
     
     buildings_inside = []
+    sequential_id = 1  # Start with ID 1 for sequential numbering
     
     for bldg_data in buildings_to_check:
         # Get building coordinates and create Shapely polygon
@@ -105,21 +106,13 @@ def save_buildings_simple_format(results_data, geojson_path, output_path="buildi
             
             # Check if centroid is inside target polygon
             if target_polygon.contains(centroid_point):
-                # Extract ID number only (remove prefixes)
-                building_id = bldg_data.get('id', 'unknown')
-                display_id = building_id
-                if building_id.startswith('merged_'):
-                    display_id = building_id.replace('merged_', '')
-                elif building_id.startswith('det_'):
-                    display_id = building_id.replace('det_', '')
-                elif building_id.startswith('b_'):
-                    display_id = building_id.replace('b_', '')
-                
+                # Use sequential ID instead of original ID
                 buildings_inside.append({
-                    "id": display_id,
+                    "id": str(sequential_id),  # Sequential ID: 1, 2, 3, ...
                     "longitude": round(centroid.x, 8),
                     "latitude": round(centroid.y, 8)
                 })
+                sequential_id += 1  # Increment for next building
                 
         except Exception as e:
             print(f"Error processing building {bldg_data.get('id', 'unknown')}: {e}")
