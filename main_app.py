@@ -79,9 +79,7 @@ app = FastAPI(
     version=settings.app_version,
     debug=settings.debug,
     lifespan=lifespan,
-    openapi_version="3.0.0",
-    root_path="/ai",  # ✅ WAJIB ADA
-    
+    openapi_version="3.0.0"
 )
 
 # CORS middleware with configurable settings
