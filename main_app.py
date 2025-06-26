@@ -112,8 +112,8 @@ def custom_openapi():
         version=app.version,
         description=app.description,
         routes=app.routes,
+        openapi_version="3.0.0"
     )
-    openapi_schema["openapi"] = "3.0.0"
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
