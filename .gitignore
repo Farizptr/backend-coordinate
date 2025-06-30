@@ -47,6 +47,8 @@ cache/
 polygon_detection_results/
 runs/
 wandb/
+DS_Store
+
 
 # Results and temporary data
 results/
