@@ -115,11 +115,11 @@ def _extract_display_id(det_id):
             break
     return display_id
 
-def _process_single_building_detection(det_data, i, ax):
+def _process_single_building_detection(det_data, sequential_id, ax):
     """Process a single building detection and return patch data"""
     shapely_poly = det_data.get('polygon')
     confidence = det_data.get('confidence', 0.5)
-    det_id = det_data.get('id', f"b_{i}")
+    det_id = det_data.get('id', f"b_{sequential_id}")
 
     if not shapely_poly or not isinstance(shapely_poly, Polygon) or shapely_poly.is_empty:
         return None, None, None, None
@@ -129,23 +129,37 @@ def _process_single_building_detection(det_data, i, ax):
     
     # Plot centroid marker and ID
     centroid = shapely_poly.centroid
-    ax.plot(centroid.x, centroid.y, marker='o', color='darkblue', markersize=2, alpha=0.6)
+    ax.plot(centroid.x, centroid.y, marker='o', color='darkblue', markersize=1, alpha=0.6)
     
-    display_id = _extract_display_id(det_id)
-    ax.text(centroid.x, centroid.y, str(display_id), color='black', fontsize=3,
+    # Use sequential ID instead of extracting from det_id
+    ax.text(centroid.x, centroid.y, str(sequential_id), color='black', fontsize=4,
             ha='center', va='bottom')
 
     return mpl_patch, shapely_poly, confidence, det_id
 
-def _process_building_detections(ax, merged_detections):
-    """Process all building detections and return patch collections data"""
+def _process_building_detections(ax, merged_detections, polygon_area):
+    """Process all building detections, filter by polygon area, sort by position, and return patch collections data"""
     building_patches_mpl = []
     shapely_polygons_for_eval = []
     confidence_values_for_color = []
     building_ids_for_text = []
 
-    for i, det_data in enumerate(merged_detections):
-        mpl_patch, shapely_poly, confidence, det_id = _process_single_building_detection(det_data, i, ax)
+    # Filter buildings that are inside the polygon area
+    buildings_inside = []
+    for det_data in merged_detections:
+        shapely_poly = det_data.get('polygon')
+        if shapely_poly and isinstance(shapely_poly, Polygon) and not shapely_poly.is_empty:
+            centroid = shapely_poly.centroid
+            # Check if building centroid is inside the study area polygon
+            if polygon_area.contains(centroid):
+                buildings_inside.append(det_data)
+    
+    # Sort buildings from top-left: latitude descending (north first), then longitude ascending (west first)
+    buildings_inside.sort(key=lambda det: (-det.get('polygon').centroid.y, det.get('polygon').centroid.x))
+    
+    # Process sorted buildings with sequential IDs
+    for sequential_id, det_data in enumerate(buildings_inside, start=1):
+        mpl_patch, shapely_poly, confidence, det_id = _process_single_building_detection(det_data, sequential_id, ax)
         
         if mpl_patch is not None:
             building_patches_mpl.append(mpl_patch)
@@ -159,7 +173,7 @@ def _add_building_patches(ax, building_patches_mpl):
     """Add building patches to the plot"""
     if building_patches_mpl:
         normal_collection = PatchCollection(
-            building_patches_mpl, facecolor='none', alpha=1.0, edgecolor='black', linewidth=0.5
+            building_patches_mpl, facecolor='none', alpha=1.0, edgecolor='black', linewidth=0.3
         )
         ax.add_collection(normal_collection)
 
@@ -223,7 +237,7 @@ def visualize_polygon_detections(geojson_path, results_data, output_path=None):
     
     # Process building detections
     merged_detections = results_data.get('merged_detections_shapely', [])
-    building_patches_mpl, _, _, _ = _process_building_detections(ax, merged_detections)
+    building_patches_mpl, _, _, _ = _process_building_detections(ax, merged_detections, polygon_area)
     
     # Add building patches to plot
     _add_building_patches(ax, building_patches_mpl)
