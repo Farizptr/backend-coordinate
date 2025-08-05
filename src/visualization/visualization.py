@@ -125,11 +125,11 @@ def _process_single_building_detection(det_data, sequential_id, ax):
         return None, None, None, None
 
     # Create matplotlib patch
-    mpl_patch = shapely_polygon_to_mpl_patch(shapely_poly, linewidth=1, facecolor='none', edgecolor='none')
+    mpl_patch = shapely_polygon_to_mpl_patch(shapely_poly, linewidth=2.0, facecolor='none', edgecolor='none')
     
     # Plot centroid marker and ID
     centroid = shapely_poly.centroid
-    ax.plot(centroid.x, centroid.y, marker='o', color='darkblue', markersize=1, alpha=0.6)
+    ax.plot(centroid.x, centroid.y, marker='o', color='darkblue', markersize=3, alpha=0.6)
     
     # Use sequential ID instead of extracting from det_id
     ax.text(centroid.x, centroid.y, str(sequential_id), color='black', fontsize=4,
@@ -173,7 +173,7 @@ def _add_building_patches(ax, building_patches_mpl):
     """Add building patches to the plot"""
     if building_patches_mpl:
         normal_collection = PatchCollection(
-            building_patches_mpl, facecolor='none', alpha=1.0, edgecolor='black', linewidth=0.3
+            building_patches_mpl, facecolor='none', alpha=1.0, edgecolor='red', linewidth=2.0
         )
         ax.add_collection(normal_collection)
 
@@ -191,7 +191,7 @@ def _configure_plot_appearance(ax, results_data, raw_tile_data, building_patches
     if raw_tile_data:
         legend_elements.append(plt.Line2D([0], [0], color='gray', lw=0.5, label='Tile Boundaries'))
     if building_patches_mpl:
-        legend_elements.append(patches.Patch(facecolor='none', edgecolor='black', label='Building Detection'))
+        legend_elements.append(patches.Patch(facecolor='none', edgecolor='red', linewidth=2.0, label='Building Detection'))
     
     ax.legend(handles=legend_elements, loc='upper right', fontsize='small')
     ax.tick_params(axis='both', which='major', labelsize=10)
