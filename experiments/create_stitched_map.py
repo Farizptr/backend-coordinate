@@ -20,8 +20,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.path import Path as MplPath
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add src to path for imports (adjusted for experiments/ location)
+project_root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(project_root / "src"))
 
 from src.utils.geojson_utils import load_geojson, extract_polygon
 from src.core.tile_utils import get_tiles_for_polygon, get_tile_image, create_stitched_image, get_tile_bounds

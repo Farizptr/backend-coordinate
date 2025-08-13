@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+venv/
+.env
+.git/
+.gitignore
+output/
+results/
+*.pt
+.DS_Store
