@@ -1,31 +1,34 @@
+# NOTE: Pinned to current, known-stable versions from the active venv
+# Pinning ensures reproducible installs and avoids macOS segfaults (Shapely/Numpy combo)
+
 # Core ML dependencies
-ultralytics>=8.0.0
-torch>=1.13.0
-torchvision>=0.14.0
-Pillow>=9.0.0
-numpy>=1.21.0
+ultralytics==8.3.142
+torch==2.6.0
+torchvision==0.21.0
+Pillow==11.1.0
+numpy==1.26.4
 
 # Geospatial processing
-shapely>=1.8.0
-mercantile>=1.2.0
-requests>=2.25.0
+shapely==2.0.3
+mercantile==1.2.1
+requests==2.32.3
 
 # Data processing
-pandas>=1.3.0
-tqdm>=4.62.0
+pandas==2.2.3
+tqdm==4.67.1
 
 # Plotting and visualization
-matplotlib>=3.5.0
-folium>=0.12.0
+matplotlib==3.10.1
+folium==0.19.5
 
 # Web API framework
-fastapi>=0.100.0
-uvicorn[standard]>=0.22.0
-pydantic>=2.0.0
-pydantic-settings>=2.0.0
+fastapi==0.115.13
+uvicorn[standard]==0.34.3
+pydantic==2.11.7
+pydantic-settings==2.10.1
 
 # CORS and middleware
-python-multipart>=0.0.6
+python-multipart==0.0.20
 
 # Utility
-python-dotenv>=1.0.0 
+python-dotenv==1.1.1

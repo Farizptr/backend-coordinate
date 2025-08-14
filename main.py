@@ -171,8 +171,6 @@ Examples:
         # Output file summary
         print("\nOutput files:")
         output_files = [
-            "detection_results.json",
-            "buildings.json", 
             "buildings_simple.json",
             "polygon_visualization.png"
         ]

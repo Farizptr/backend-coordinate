@@ -1054,25 +1054,13 @@ def _generate_visualization(geojson_path, output_dir, total_buildings_final, til
     )
 
 def _save_output_files(output_dir, json_results_payload, geojson_path):
-    """Save all output files in different formats"""
-    # Save main results
-    results_path = os.path.join(output_dir, "detection_results.json")
-    with open(results_path, 'w') as f:
-        json.dump(json_results_payload, f, indent=2)
-    
-    # Save buildings to JSON
-    buildings_json_path = os.path.join(output_dir, "buildings.json")
-    save_buildings_to_json(json_results_payload, buildings_json_path)
-    
+    """Save only the simple buildings output file"""
     # Save buildings in simple format (only buildings inside polygon)
     buildings_simple_path = os.path.join(output_dir, "buildings_simple.json")
     save_buildings_simple_format(json_results_payload, geojson_path, buildings_simple_path)
-    
-    # Save incremental simple format results (combined from all tiles)
-    buildings_incremental_simple_path = os.path.join(output_dir, "buildings_incremental_simple.json")
-    save_incremental_simple_format(output_dir, buildings_incremental_simple_path)
-    
-    return results_path
+
+    # Return the path to the main output we keep
+    return buildings_simple_path
 
 def _finalize_session(output_dir, results_path, total_buildings_final, execution_time):
     """Finalize session with cleanup and status reporting"""
