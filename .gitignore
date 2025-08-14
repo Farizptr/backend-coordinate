@@ -48,6 +48,7 @@ polygon_detection_results/
 runs/
 wandb/
 DS_Store
+.DS_Store
 
 
 # Results and temporary data

@@ -1,261 +1,305 @@
-# 🏢 Building Detection Backend Service
+## Building Detection Backend Service
 
-A production-ready **FastAPI backend service** for building detection using YOLOv8. This service accepts polygon areas from frontend applications and returns detected buildings in GeoJSON format.
+Layanan backend FastAPI untuk deteksi bangunan menggunakan YOLOv8. Server menerima area poligon (GeoJSON), melakukan tiling, deteksi per tile, melakukan penggabungan (merging), dan mengembalikan daftar titik centroid bangunan sederhana dalam JSON.
 
-## 🚀 Quick Start
+Catatan penting: saat ini kode mengambil tile peta OSM standar (bukan citra satelit). Model yang dilatih pada citra satelit bisa berkinerja buruk pada peta OSM. Untuk hasil akurat, gunakan penyedia citra satelit (lihat bagian Sumber Citra & Rekomendasi).
 
-### 1. Installation
+### Ringkas (English)
+FastAPI backend for building detection with YOLOv8. Accepts polygon GeoJSON and returns building centroid points. Current tiles are OSM map tiles (not satellite). For accurate results, switch to a satellite imagery provider.
+
+### Fitur Utama
+- FastAPI + OpenAPI docs
+- Mode sinkron dan asinkron (job queue in-memory)
+- Penggabungan deteksi lintas-tile (Union-Find, IoU, boundary-aware)
+- Output sederhana: `[ { id, longitude, latitude } ]`
+- Konfigurasi lewat environment variables
+
+---
+
+## Struktur Proyek (ringkas)
+```
+building-detector/
+├─ run_server.py            # Entrypoint server (uvicorn)
+├─ main_app.py              # FastAPI app (routers, deps, lifespan)
+├─ api/                     # Layer API: routers, models, services
+├─ src/                     # Pipeline deteksi (tiling, YOLO, merging)
+├─ examples/                # Contoh GeoJSON
+├─ output/                  # Hasil deteksi
+└─ requirements.txt         # Dependensi Python (pinned)
+```
+
+---
+
+## Persyaratan Sistem
+- Python 3.12 (lihat `Dockerfile` untuk container image)
+- Model YOLOv8 file `best.pt` tersedia pada `MODEL_PATH`
+- Opsional: GPU (CUDA) untuk performa lebih cepat
+
+---
+
+## Instalasi (Lokal)
 ```bash
-git clone https://github.com/Farizptr/backend-coordinate.git
-cd backend-coordinate
-   pip install -r requirements.txt
-   ```
+python -m venv .venv
+source .venv/bin/activate   # macOS/Linux
+pip install -r requirements.txt
 
-### 2. Start the API Server
+
+```
+
+---
+
+## Konfigurasi
+Semua konfigurasi dikelola via `api/config.py` (Pydantic Settings) dan `.env`.
+
+Variabel utama:
+- `HOST` (default: `0.0.0.0`)
+- `PORT` (default: `5050`)
+- `RELOAD` (default: `true` untuk dev)
+- `LOG_LEVEL` (default: `info`)
+- `MODEL_PATH` (default: `best.pt`)
+- `MAX_CONCURRENT_JOBS` (default: `2`)
+
+
+Contoh `.env`:
+```bash
+HOST=0.0.0.0
+PORT=5050
+RELOAD=false
+LOG_LEVEL=info
+MODEL_PATH=best.pt
+MAX_CONCURRENT_JOBS=2
+```
+
+---
+
+## Menjalankan Server API
 ```bash
 python run_server.py
 ```
 
-### 3. Access the API
-- **API Server**: http://localhost:8000
-- **Interactive Documentation**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
+Server menggunakan base path `/ai` (lihat `main_app.py`).
 
-## 📡 API Endpoints
+- Docs: `http://localhost:5050/ai/docs`
+- Health: `http://localhost:5050/ai/health`
 
-### 🏥 Health Check
-```http
-GET /health
-```
-Check if the API server and model are ready.
+Jika ingin URL tanpa prefix, hapus `root_path="/ai"` di `main_app.py` dan sesuaikan dokumentasi ini.
 
-**Response:**
-```json
-{
-  "status": "healthy",
-  "model_loaded": true,
-  "timestamp": "2024-01-01T12:00:00"
-}
-```
+---
 
-### 🔍 Building Detection
-```http
-POST /detect
-```
-Submit a polygon area for building detection.
+## Referensi API
 
-**Request Body:**
-```json
-{
-  "polygon": {
-    "type": "Feature",
-    "geometry": {
-      "type": "Polygon",
-      "coordinates": [[[lng, lat], [lng, lat], ...]]
+Semua path di bawah diasumsikan dengan base path `/ai`.
+
+### Kesehatan
+- `GET /health`
+  - Cek status server dan apakah model termuat
+  - Respon:
+  ```json
+  { "status": "healthy", "model_loaded": true, "timestamp": "2024-01-01T12:00:00" }
+  ```
+
+### Informasi Model
+- `GET /model/info`
+  - 503 jika model belum termuat
+  - Respon contoh:
+  ```json
+  { "model_loaded": true, "model_type": "YOLOv8", "model_file": "best.pt" }
+  ```
+
+### Deteksi Sinkron
+- `POST /detect/sync`
+  - Body (contoh):
+  ```json
+  {
+    "polygon": {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[106.84, -6.21], [106.85, -6.21], [106.85, -6.20], [106.84, -6.20], [106.84, -6.21]]]
+      },
+      "properties": {}
     },
-    "properties": {}
-  },
-  "zoom": 18,
-  "confidence": 0.25,
-  "enable_merging": true
-}
-```
+    "zoom": 18,
+    "confidence": 0.25,
+    "batch_size": 5,
+    "enable_merging": true,
+    "merge_iou_threshold": 0.1,
+    "merge_touch_enabled": true,
+    "merge_min_edge_distance_deg": 0.00001
+  }
+  ```
+  - Respon (contoh):
+  ```json
+  {
+    "success": true,
+    "message": "Building detection completed successfully",
+    "buildings": [ { "id": "1", "longitude": 106.8456, "latitude": -6.2088 } ],
+    "total_buildings": 1,
+    "execution_time": 12.3
+  }
+  ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Building detection completed successfully",
-  "buildings": [
-    {
-      "id": "building_1",
-      "coordinates": [[lng, lat], [lng, lat], ...],
-      "confidence": 0.85
-    }
-  ],
-  "total_buildings": 42,
-  "execution_time": 15.3
-}
-```
-
-### 🤖 Model Information
-```http
-GET /models/info
-```
-Get information about the loaded YOLOv8 model.
-
-## 🧪 Testing the API
-
-Run the test script to verify everything works:
+Curl contoh:
 ```bash
-python test_api.py
+curl -X POST http://localhost:5050/ai/detect/sync \
+  -H "Content-Type: application/json" \
+  -d @examples/sample_polygon.geojson
 ```
 
-## 🏗️ Frontend Integration
+### Deteksi Asinkron (Job)
+- `POST /detect/async` → submit job
+  - Body sama seperti sinkron, opsional `job_id`
+  - Respon:
+  ```json
+  { "job_id": "<id>", "status": "queued", "message": "Detection job submitted successfully.", "submitted_at": "..." }
+  ```
+- `GET /job/{job_id}` → status job
+- `GET /job/{job_id}/result` → hasil akhir (202 jika belum selesai)
+- `DELETE /job/{job_id}` → batalkan job
+- `GET /jobs` → daftar semua job (debug)
 
-### JavaScript/React Example
-```javascript
-async function detectBuildings(polygon) {
-  const response = await fetch('http://localhost:8000/detect', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      polygon: polygon,
-      zoom: 18,
-      confidence: 0.25,
-      enable_merging: true
-    })
-  });
-  
-  const result = await response.json();
-  return result.buildings;
-}
-```
+### Validasi Input
+- `job_id`: 3–50 karakter, alfanumerik, `-`/`_`, tidak boleh diawali/diakhiri simbol
+- GeoJSON: harus `Polygon`/`MultiPolygon` yang valid
 
-### Python Example
-```python
-import requests
+---
 
-def detect_buildings(polygon_geojson):
-    payload = {
-        "polygon": polygon_geojson,
-        "zoom": 18,
-        "confidence": 0.25
-    }
-    
-    response = requests.post(
-        "http://localhost:8000/detect",
-        json=payload
-    )
-    
-    return response.json()
-```
+## Menjalankan CLI (opsional/legacy)
 
-## ⚙️ Configuration
-
-### Parameters
-- **zoom**: Satellite image zoom level (default: 18)
-- **confidence**: Detection confidence threshold (default: 0.25)
-- **batch_size**: Tile processing batch size (default: 5)
-- **enable_merging**: Merge overlapping detections (default: true)
-- **merge_iou_threshold**: IoU threshold for merging (default: 0.1)
-
-### Environment Variables
-Create a `.env` file for custom configuration:
+### Tanpa Docker (Lokal)
+1) Pastikan dependensi terpasang dan file model tersedia (default `best.pt` di root, atau set `--model`).
+2) Jalankan perintah berikut:
 ```bash
-API_HOST=0.0.0.0
-API_PORT=8000
-MODEL_PATH=best.pt
-LOG_LEVEL=info
+python main.py examples/sample_polygon.geojson \
+  --output output/ \
+  --zoom 18 \
+  --conf 0.25 \
+  --batch-size 5
 ```
+3) Hasil utama tersedia di `output/buildings_simple.json`.
+4) (Opsional) Validasi pada peta: `python src/validation/validate.py` → menghasilkan `building_validation_map.html`.
 
-## 📁 Project Structure
+Catatan: Anda dapat mengganti `--model best.pt` dengan path lain jika model tidak berada di root.
 
-```
-backend-coordinate/
-├── api.py                 # FastAPI application
-├── run_server.py          # Server startup script
-├── test_api.py            # API testing script
-├── main.py                # CLI interface (legacy)
-├── config.py              # Configuration management
-├── best.pt                # YOLOv8 model (excluded from git)
-├── src/
-│   ├── core/              # Core detection algorithms
-│   ├── utils/             # Utility functions
-│   ├── validation/        # Data validation
-│   └── visualization/     # Plotting and maps
-├── docs/                  # Technical documentation
-├── examples/              # Sample files and usage
-└── requirements.txt       # Python dependencies
-```
-
-## 🔧 Features
-
-### ✨ Production Ready
-- **FastAPI** framework with automatic API documentation
-- **Async processing** with background task cleanup
-- **CORS support** for frontend integration
-- **Error handling** with proper HTTP status codes
-- **Health checks** for monitoring
-
-### 🏢 Building Detection
-- **YOLOv8** state-of-the-art object detection
-- **Advanced merging** algorithms for fragmented buildings
-- **Batch processing** for efficient tile handling
-- **Resume capability** for large area processing
-- **GeoJSON output** compatible with mapping libraries
-
-### 🗺️ Geospatial Processing
-- **Satellite tile** fetching and processing
-- **Coordinate transformation** between systems
-- **Polygon validation** and preprocessing
-- **Boundary-aware merging** for cross-tile buildings
-
-## 🚀 Deployment
-
-### Docker (Recommended)
-```dockerfile
-FROM python:3.9-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-EXPOSE 8000
-
-CMD ["python", "run_server.py"]
-```
-
-### Production Server
+### Dengan Docker
+Pastikan image sudah dibangun:
 ```bash
-# Using Gunicorn
-pip install gunicorn
-gunicorn api:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
-
-# Using PM2
-npm install -g pm2
-pm2 start run_server.py --name building-detection-api
+docker build -t building-detector:latest .
 ```
 
-## 📊 Performance
-
-- **Processing Speed**: ~2-5 seconds per 1km² area
-- **Memory Usage**: ~2-4GB RAM (depends on model and area size)
-- **Scalability**: Stateless design supports horizontal scaling
-- **Concurrency**: Async processing with background cleanup
-
-## 🛠️ Development
-
-### CLI Interface (Legacy)
-The original CLI interface is still available:
+- Menggunakan contoh GeoJSON yang sudah ada di image:
 ```bash
-python main.py examples/sample_polygon.geojson --output results/
+docker run --rm \
+  -v $(pwd)/best.pt:/app/best.pt \
+  -v $(pwd)/output:/app/output \
+  building-detector:latest \
+  python main.py examples/sample_polygon.geojson \
+    --output output \
+    --zoom 18 \
+    --conf 0.25 \
+    --batch-size 5
 ```
 
-### Adding New Features
-1. Add endpoint to `api.py`
-2. Implement logic in `src/` modules
-3. Add tests to `test_api.py`
-4. Update documentation
+- Menggunakan GeoJSON dari host:
+```bash
+docker run --rm \
+  -v $(pwd)/best.pt:/app/best.pt \
+  -v $(pwd)/my_area.geojson:/app/examples/my_area.geojson \
+  -v $(pwd)/output:/app/output \
+  building-detector:latest \
+  python main.py examples/my_area.geojson \
+    --output output \
+    --zoom 18 \
+    --conf 0.25 \
+    --batch-size 5
+```
 
-## 📝 License
+Keterangan:
+- `-v $(pwd)/best.pt:/app/best.pt`: memasang file model ke dalam container.
+- `-v $(pwd)/output:/app/output`: hasil deteksi akan tersedia di folder host `./output`.
+- Untuk file GeoJSON kustom, mount ke path di dalam container lalu rujuk path tersebut saat menjalankan `main.py`.
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+---
 
-## 🤝 Contributing
+## Cara Kerja Pipeline (Ringkas)
+1) Load poligon → hitung tile yang beririsan (mercantile)
+2) Unduh gambar tile → inferensi YOLO per tile
+3) Simpan hasil per tile (detail & simple) → gabung (merging) lintas tile
+4) Filter bangunan (centroid) yang benar-benar berada di dalam poligon input → tulis `buildings_simple.json`
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+Penggabungan memakai Union-Find multi-fase (IoU, proximity/touching dekat boundary, axis alignment) untuk mengurangi duplikasi lintas tile.
 
-## 📞 Support
+---
 
-For questions or issues:
-- Create an issue on GitHub
-- Check the API documentation at `/docs`
-- Review the examples in `examples/`
+## Sumber Citra & Rekomendasi
+Saat ini fungsi `get_tile_image` di `src/core/tile_utils.py` memakai:
+```text
+https://tile.openstreetmap.org/{z}/{x}/{y}.png
+```
+Ini adalah peta OSM standar (bukan citra satelit). Jika model Anda dilatih pada citra satelit/udara, gunakan penyedia citra satelit (mis. Mapbox Satellite, WMTS/WMS lain) dan sesuaikan `get_tile_image` untuk memanggil provider tersebut (biasanya butuh API key dan kepatuhan T&C). Pertimbangkan caching lokal dan rate limiting.
+
+---
+
+## Tuning Performa
+- `zoom` (default 18): lebih tinggi = lebih banyak tile, lebih detail, lebih lambat
+- `batch_size` (default 5): jumlah tile per batch; I/O dan memori terpengaruh
+- `MAX_CONCURRENT_JOBS`: batasi beban asinkron
+- GPU inference: percepat inferensi YOLO
+- Hindari menyimpan image tile dalam memori jika tidak diperlukan (opsional optimisasi lanjutan)
+
+---
+
+## Keamanan & Operasional
+- CORS diaktifkan luas (origins `*` dan credentials `true`) → sesuaikan untuk produksi
+- Rate limiting & auth belum tersedia → rekomendasi pakai reverse proxy (Nginx/Traefik)
+- Logging masih `print` → rekomendasi gunakan `logging` dengan format terstruktur
+- Job persistence in-memory → tambahkan pembersihan berkala sesuai `job_cleanup_interval_hours`
+
+---
+
+## Validasi Hasil pada Peta (Folium)
+Setelah deteksi sinkron, jalankan:
+```bash
+python src/validation/validate.py
+```
+Menghasilkan `building_validation_map.html` yang menampilkan titik centroid dari `output/buildings_simple.json`.
+
+---
+
+## Deployment dengan Docker
+```bash
+docker build -t building-detector:latest .
+docker run --rm -p 5050:5050 \
+  -e HOST=0.0.0.0 -e PORT=5050 -e RELOAD=false -e LOG_LEVEL=info \
+  -v $(pwd)/best.pt:/app/best.pt \
+  building-detector:latest
+```
+Lalu akses `http://localhost:5050/ai/docs`.
+
+---
+
+## Troubleshooting
+- 503 Model Not Loaded: pastikan `MODEL_PATH` menunjuk file `.pt` yang ada
+- 404 pada `/docs`/`/health`: ingat base path `/ai` (gunakan `/ai/docs`, `/ai/health`)
+- 429 Server at Capacity: kurangi concurrent jobs atau naikkan `MAX_CONCURRENT_JOBS`
+- 400 Invalid GeoJSON: perbaiki struktur poligon
+- Hasil kosong: ingat OSM tiles bukan citra satelit; ganti sumber citra
+
+---
+
+## Kontribusi & Lisensi
+- Pull request dan isu dipersilakan.
+- Lisensi: MIT (jika tidak ada, tambahkan file LICENSE sesuai kebutuhan).
+
+---
+
+## Dokumentasi Lebih Lanjut
+- Ikhtisar: `docs/overview.md`
+- Arsitektur: `docs/architecture.md`
+- Referensi API: `docs/api_reference.md`
+- Konfigurasi: `docs/configuration.md`
+- Pipeline Deteksi: `docs/pipeline.md`
+- Deployment: `docs/deployment.md`
+- Troubleshooting: `docs/troubleshooting.md`
+- Sumber Citra: `docs/imagery.md`
+
