@@ -32,18 +32,17 @@ class DetectionService:
         try:
             # Update status to processing
             logger.info(f"Starting detection job {job_id}")
-            job_manager.update_job_progress(job_id, 1, "Initializing detection process", 0)
+            job_manager.update_job_progress(job_id, 5, "Initializing detection process", 0)
             
             # Create temporary directory for this job
             temp_dir = tempfile.mkdtemp(prefix=f"async_detection_{job_id}_")
-            job_manager.update_job_progress(job_id, 3, "Created temporary workspace", 0)
             
             # Create temporary GeoJSON file
             geojson_path = os.path.join(temp_dir, "input_polygon.geojson")
             with open(geojson_path, 'w') as f:
                 json.dump(job.polygon, f, indent=2)
             
-            job_manager.update_job_progress(job_id, 5, "Prepared input files", 0)
+            job_manager.update_job_progress(job_id, 10, "Created temporary files", 0)
             
             # Validate GeoJSON
             try:
@@ -52,11 +51,12 @@ class DetectionService:
                 job_manager.fail_job(job_id, f"Invalid GeoJSON format: {str(e)}")
                 return
             
-            job_manager.update_job_progress(job_id, 8, "Validated input polygon", 0)
+            job_manager.update_job_progress(job_id, 15, "Validated input polygon", 0)
             
             # Output directory for results
             output_dir = os.path.join(temp_dir, "results")
-            job_manager.update_job_progress(job_id, 10, "Setting up output directory", 0)
+            
+            job_manager.update_job_progress(job_id, 20, "Preparing for tile processing", 0)
             
             # Extract parameters from job
             params = job.request_params
@@ -92,7 +92,7 @@ class DetectionService:
                     else:
                         buildings_data = []
             
-            job_manager.update_job_progress(job_id, 96, "Finalizing results", len(buildings_data))
+            job_manager.update_job_progress(job_id, 95, "Finalizing results", len(buildings_data))
             
             # Complete job with results
             result_data = {
@@ -135,7 +135,7 @@ class DetectionService:
         
         if job_id:
             logger.info(f"Starting tile-based detection for job {job_id}")
-            job_manager.update_job_progress(job_id, 12, "Calculating tile grid", 0)
+            job_manager.update_job_progress(job_id, 25, "Calculating tile grid", 0)
         
         # Import the detection function here to avoid circular imports
         from src.core.polygon_detection import (
@@ -153,41 +153,35 @@ class DetectionService:
             
             if job_id:
                 logger.info(f"Job {job_id}: Processing {len(tiles)} tiles at zoom level {zoom}")
-                job_manager.update_job_progress(job_id, 15, f"Downloading {len(tiles)} satellite tiles", 0)
+                job_manager.update_job_progress(job_id, 35, f"Downloading {len(tiles)} satellite tiles", 0)
             
             # Handle resume logic
             all_detections_raw_per_tile, tiles_to_process = _handle_resume_logic(resume_from_saved, output_dir, tiles)
             
             if job_id:
                 logger.info(f"Job {job_id}: Will process {len(tiles_to_process)} tiles (resume enabled: {resume_from_saved})")
-                job_manager.update_job_progress(job_id, 20, f"Running AI inference on {len(tiles_to_process)} tiles", 0)
-            
-            # Define progress callback for dynamic updates
-            def tile_progress_callback(completed_batches, total_batches, total_tiles_processed):
-                if job_id:
-                    batch_progress = completed_batches / max(total_batches, 1)
-                    progress = 20 + int(60 * batch_progress)  # Progress from 20% to 80%
-                    buildings_detected = sum(len(tile_data.get('boxes', [])) for tile_data in all_detections_raw_per_tile)
-                    job_manager.update_job_progress(
-                        job_id, 
-                        min(progress, 80), 
-                        f"AI inference: {completed_batches}/{total_batches} batches ({total_tiles_processed} tiles)", 
-                        buildings_detected
-                    )
+                job_manager.update_job_progress(job_id, 40, f"Running AI inference on {len(tiles_to_process)} tiles", 0)
             
             # Execute tile processing with progress tracking
             all_detections_raw_per_tile = _execute_tile_processing(
-                tiles_to_process, batch_size, model, conf, output_dir, all_detections_raw_per_tile, tile_progress_callback
+                tiles_to_process, batch_size, model, conf, output_dir, all_detections_raw_per_tile
             )
             
-            # Tile processing progress updates are now handled by the callback above
+            if job_id:
+                # Update progress during tile processing
+                processed_tiles = len(all_detections_raw_per_tile)
+                total_tiles = len(tiles)
+                progress = 40 + int(35 * processed_tiles / max(total_tiles, 1))  # Progress from 40% to 75%
+                buildings_detected = sum(len(tile_data.get('boxes', [])) for tile_data in all_detections_raw_per_tile)
+                logger.info(f"Job {job_id}: Processed {processed_tiles}/{total_tiles} tiles, found {buildings_detected} raw detections")
+                job_manager.update_job_progress(job_id, min(progress, 75), f"AI inference: {processed_tiles}/{total_tiles} tiles", buildings_detected)
             
             if job_id:
                 # Count total buildings found so far
                 total_buildings_so_far = sum(len(tile_data.get('boxes', [])) for tile_data in all_detections_raw_per_tile)
                 logger.info(f"Job {job_id}: Starting post-processing with {total_buildings_so_far} raw detections")
                 merge_action = "Merging overlapping buildings" if enable_merging else "Converting coordinates"
-                job_manager.update_job_progress(job_id, 82, merge_action, total_buildings_so_far)
+                job_manager.update_job_progress(job_id, 80, merge_action, total_buildings_so_far)
             
             # Process results based on merging setting
             if enable_merging:
@@ -199,7 +193,7 @@ class DetectionService:
             
             if job_id:
                 logger.info(f"Job {job_id}: Post-processing complete, {total_buildings_final} final buildings")
-                job_manager.update_job_progress(job_id, 88, "Generating output files", total_buildings_final)
+                job_manager.update_job_progress(job_id, 90, "Generating output files", total_buildings_final)
             
             # Create results payload
             json_results_payload = _create_results_payload(
@@ -208,7 +202,7 @@ class DetectionService:
                 final_detections_for_json, start_time)
             
             if job_id:
-                job_manager.update_job_progress(job_id, 92, "Finalizing results", total_buildings_final)
+                job_manager.update_job_progress(job_id, 95, "Finalizing results", total_buildings_final)
             
             # Skip visualization for background jobs to avoid GUI thread issues
             if not job_id:

@@ -899,7 +899,7 @@ def _handle_resume_logic(resume_from_saved, output_dir, tiles):
     
     return all_detections_raw_per_tile, tiles_to_process
 
-def _execute_tile_processing(tiles_to_process, batch_size, model, conf, output_dir, all_detections_raw_per_tile):
+def _execute_tile_processing(tiles_to_process, batch_size, model, conf, output_dir, all_detections_raw_per_tile, progress_callback=None):
     """Execute parallel tile processing and return updated detections"""
     if not tiles_to_process:
         print("All tiles have been processed previously. Proceeding to merging...")
@@ -924,6 +924,7 @@ def _execute_tile_processing(tiles_to_process, batch_size, model, conf, output_d
         future_to_batch = {executor.submit(process_batch, batch): i for i, batch in enumerate(tile_batches)}
         
         # Process results as they complete
+        completed_batches = 0
         for future in tqdm(concurrent.futures.as_completed(future_to_batch), 
                           total=len(tile_batches), 
                           desc="Processing tile batches"):
@@ -936,9 +937,18 @@ def _execute_tile_processing(tiles_to_process, batch_size, model, conf, output_d
                         save_tile_results(tile_detection, output_dir, tile_detection['tile'])
                     
                     all_detections_raw_per_tile.extend(batch_detections) # Store raw per-tile results
+                
+                # Call progress callback if provided
+                completed_batches += 1
+                if progress_callback:
+                    progress_callback(completed_batches, len(tile_batches), len(all_detections_raw_per_tile))
+                    
             except (RuntimeError, ValueError, IOError) as exc:
                 print(f"Batch {batch_idx} generated an exception: {exc}")
                 # Continue processing other batches even if one fails
+                completed_batches += 1
+                if progress_callback:
+                    progress_callback(completed_batches, len(tile_batches), len(all_detections_raw_per_tile))
     
     return all_detections_raw_per_tile
 

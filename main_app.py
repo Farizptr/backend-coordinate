@@ -8,9 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
 import os
+import time
+import tempfile
 
 # Import existing detection system
 from src.core.detection import load_model
+
+# Import logging system
+from api.utils.logging import get_logger, log_performance, setup_logging
 
 # Import configuration and dependencies
 from api.config import get_settings, validate_configuration, print_configuration
@@ -19,6 +24,7 @@ from api.exceptions import register_exception_handlers
 
 # Import routers
 from api.routers import health_router, detection_router, jobs_router, jobs_list_router
+from api.routers.websocket import router as websocket_router
 
 # Get settings
 settings = get_settings()
@@ -36,18 +42,42 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler (replaces deprecated on_event)"""
     global model, executor
     
+    # Setup logging first
+    logger = get_logger(__name__)
+    
     # Startup
     print_configuration()
     
     try:
         if os.path.exists(settings.model_path):
+            logger.info(f"Loading YOLOv8 model from {settings.model_path}")
             model = load_model(settings.model_path)
-            print(f"✅ Model loaded successfully from {settings.model_path}")
+            
+            # Warm up model with dummy inference
+            logger.info("Warming up model with test inference")
+            try:
+                # Create a small test image (256x256 RGB)
+                import torch
+                import numpy as np
+                from PIL import Image
+                
+                test_img = Image.fromarray(np.random.randint(0, 255, (256, 256, 3), dtype=np.uint8))
+                start_time = time.time()
+                
+                # Run dummy prediction to warm up GPU/model
+                model(test_img, conf=0.5, verbose=False)
+                warmup_time = time.time() - start_time
+                
+                logger.info(f"Model warmup completed in {warmup_time:.2f}s")
+            except Exception as warmup_error:
+                logger.warning(f"Model warmup failed (non-critical): {warmup_error}")
+            
+            logger.info(f"Model loaded and ready for inference")
         else:
-            print(f"⚠️ Model file not found at {settings.model_path}")
+            logger.warning(f"Model file not found at {settings.model_path}")
             model = None
     except Exception as e:
-        print(f"❌ Error loading model: {e}")
+        logger.error(f"Error loading model: {e}")
         model = None
     
     # Initialize dependencies
@@ -101,6 +131,7 @@ app.include_router(health_router)
 app.include_router(detection_router)
 app.include_router(jobs_router)
 app.include_router(jobs_list_router)
+app.include_router(websocket_router)
 
 # FastAPI will handle OpenAPI schema generation natively with openapi_version="3.0.0"
 

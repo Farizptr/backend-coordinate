@@ -134,7 +134,37 @@ class JobManager:
         # Sort by start time (newest first)
         jobs_summary.sort(key=lambda x: x["start_time"], reverse=True)
         return jobs_summary
+    
+    def get_job_statistics(self) -> Dict[str, int]:
+        """Get comprehensive job statistics"""
+        with self.job_lock:
+            stats = {
+                "total": len(self.active_jobs),
+                "queued": 0,
+                "processing": 0,
+                "completed": 0,
+                "failed": 0,
+                "cancelled": 0
+            }
+            
+            for job in self.active_jobs.values():
+                if job.status == JobStatus.QUEUED:
+                    stats["queued"] += 1
+                elif job.status == JobStatus.PROCESSING:
+                    stats["processing"] += 1
+                elif job.status == JobStatus.COMPLETED:
+                    stats["completed"] += 1
+                elif job.status == JobStatus.FAILED:
+                    stats["failed"] += 1
+                elif job.status == JobStatus.CANCELLED:
+                    stats["cancelled"] += 1
+            
+            return stats
 
 
 # Global job manager instance
-job_manager = JobManager() 
+job_manager = JobManager()
+
+# For compatibility - update references in the job manager
+job_manager.jobs = job_manager.active_jobs  # Alias for backward compatibility
+job_manager.lock = job_manager.job_lock  # Alias for backward compatibility 

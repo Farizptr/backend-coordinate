@@ -25,7 +25,10 @@ ENV HOST=0.0.0.0 \
     PORT=5050 \
     RELOAD=false \
     LOG_LEVEL=info \
-    MODEL_PATH=/app/best.pt
+    MODEL_PATH=/app/best.pt \
+    MAX_CONCURRENT_JOBS=4 \
+    DEFAULT_BATCH_SIZE=8 \
+    JOB_CLEANUP_INTERVAL_HOURS=0.5
 
 EXPOSE 5050
 

@@ -73,6 +73,7 @@ class DatabaseSettings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 class SecuritySettings(BaseSettings):
@@ -85,6 +86,7 @@ class SecuritySettings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 # Global settings instances
